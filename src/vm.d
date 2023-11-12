@@ -82,20 +82,33 @@ enum Mode {
     immediate
 }
 
-enum State: uint_fast8_t {
+enum State {
     ok = 1 << 0,
     outputFull = 1 << 1,
-    inputEmpty = 1 << 2,
-    halted = 1 << 3,
-    invalid = 1 << 4
+    halted = 1 << 2,
+    invalid = 1 << 3
+}
+
+enum Event {
+    none,
+    needInput = 1 << 0,
+    output = 1 << 1,
+    halt = 1 << 2,
+    error = 1 << 3
+}
+
+struct IOModule {
+    size_t delegate() inputAvailable;
+    int64_t delegate() inputProvider;
+    size_t delegate() outputCapacity;
+    void delegate(int64_t) outputHandler;
 }
 
 struct VM {
     State state;
     size_t ip;
     int64_t[4096] memory;
-    auto input = RingBuffer!(int64_t, 32)();
-    auto output = RingBuffer!(int64_t, 32)();
+    IOModule io;
 
     void loadProgram(ref Program prog) {
         import core.stdc.string : memcpy;
@@ -126,71 +139,96 @@ struct VM {
         return true;
     }
 
-    void step() {
+    Event step() {
         immutable(OpData)* op;
         int64_t*[MaxArgs] p;
 
         if (!getNextOp(op, p)) {
             state = State.invalid;
-            return;
+            return Event.error;
         }
+
+        scope auto inc = () { ip += 1 + op.argc; };
 
         final switch (op.code) {
             case Opcode.add:
                 *p[2] = *p[0] + *p[1];
-                ip += 1 + op.argc;
-                break;
+                inc();
+                return Event.none;
+
             case Opcode.multiply:
                 *p[2] = *p[0] * *p[1];
-                ip += 1 + op.argc;
-                break;
+                inc();
+                return Event.none;
+
             case Opcode.input:
-                if (input.take(*p[0]))
-                    ip += 1 + op.argc;
-                else
-                    state = State.inputEmpty;
-                break;
+                if (!io.inputAvailable()) {
+                    return Event.needInput;
+                }
+                *p[0] = io.inputProvider();
+                inc();
+                return Event.none;
+
             case Opcode.output:
-                if (output.put(*p[0]))
-                    ip += 1 + op.argc;
-                else
+                if (!io.outputCapacity()) {
                     state = State.outputFull;
-                break;
+                    return Event.error;
+                }
+                io.outputHandler(*p[0]);
+                inc();
+                return Event.output;
+
             case Opcode.jumpTrue:
                 if (*p[0])
                     ip = *p[1];
                 else
-                    ip += 1 + op.argc;
-                break;
+                    inc();
+                return Event.none;
+
             case Opcode.jumpFalse:
                 if (!*p[0])
                     ip = *p[1];
                 else
-                    ip += 1 + op.argc;
-                break;
+                    inc();
+                return Event.none;
+
             case Opcode.lessThan:
                 *p[2] = *p[0] < *p[1] ? 1 : 0;
-                ip += 1 + op.argc;
-                break;
+                inc();
+                return Event.none;
+
             case Opcode.equals:
                 *p[2] = *p[0] == *p[1] ? 1 : 0;
-                ip += 1 + op.argc;
-                break;
+                inc();
+                return Event.none;
+
             case Opcode.halt:
                 state = State.halted;
-                break;
+                return Event.halt;
         }
-    }
-
-    State runUntil(uint_fast8_t flags) {
-        while (!(state & flags))
-            step();
-        return state;
     }
 
     State run() {
         while (state == state.ok)
             step();
         return state;
+    }
+
+    Event runUntil(Event flags) {
+        if (state != state.ok)
+            return Event.none;
+        
+        flags = flags | Event.halt | Event.error;
+
+        Event event;
+        do {
+            event = step();
+        } while (!(event & flags));
+
+        return event;
+    }
+
+    this(ref IOModule io) {
+        this.io = io;
     }
 }

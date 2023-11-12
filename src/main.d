@@ -2,6 +2,7 @@ import core.stdc.stdio;
 import vm;
 static import day2;
 static import day5;
+static import day7;
 
 struct Mode {
     const char* name;
@@ -13,7 +14,9 @@ immutable static Mode[] modes = [
     {"day2s", &day2.runSilver, "Gravity Assist"},
     {"day2g", &day2.runGold,   "Parameter Modes"},
     {"day5s", &day5.runSilver, "T.E.S.T."},
-    {"day5g", &day5.runGold,   "---"}
+    {"day5g", &day5.runGold,   "Jumps & Comparisons"},
+    {"day7s", &day7.runSilver, "Amplification Circuit"},
+    {"day7g", &day7.runGold,   "Feedback Loop"}
 ];
 
 auto findMode(const char* name) {

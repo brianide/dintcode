@@ -32,7 +32,7 @@ Program readProgram(const char* path) {
     int64_t value;
     while (!feof(f) && fscanf(f, "%ld,", &value) == 1) {
         if (cursor == capacity) {
-            capacity *= 1.5;
+            capacity = cast(size_t) (capacity * 1.5);
             buffer = cast(int64_t*) realloc(buffer, capacity * int64_t.sizeof);
         }
         buffer[cursor++] = value;

@@ -1,0 +1,9 @@
+{
+	"authors": [
+		"Brian Dixon"
+	],
+	"copyright": "Copyright © 2023, Brian Dixon",
+	"description": "An Intcode VM implemented in D",
+	"license": "GNU GENERAL PUBLIC LICENSE Version 3",
+	"name": "dintcode"
+}

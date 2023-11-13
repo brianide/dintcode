@@ -25,8 +25,7 @@ struct Handler(int64_t V) {
 }
 
 void runSilver(ref Program prog) {
-    scope auto vm = VM();
-    vm.loadProgram(prog);
+    scope auto vm = VM(prog);
 
     auto handler = Handler!1();
     vm.io = handler.getModule();
@@ -36,8 +35,7 @@ void runSilver(ref Program prog) {
 }
 
 void runGold(ref Program prog) {
-    scope auto vm = VM();
-    vm.loadProgram(prog);
+    scope auto vm = VM(prog);
 
     auto handler = Handler!5();
     vm.io = handler.getModule();

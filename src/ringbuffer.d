@@ -1,10 +1,9 @@
 module ringbuffer;
 
 import core.stdc.stdint;
-import core.stdc.stdlib : malloc, free;
 
 struct RingBuffer(T, size_t S) {
-    template IndexType() {
+    private template IndexType() {
         static if (S <= UINT_FAST8_MAX)
             alias IndexType = uint_fast8_t;
         else static if (S <= UINT_FAST16_MAX)

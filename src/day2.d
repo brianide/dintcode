@@ -5,8 +5,7 @@ import core.stdc.stdio;
 import vm;
 
 static int64_t runWith(ref Program prog, int64_t noun, int64_t verb) {
-    auto vm = VM();
-    vm.loadProgram(prog);
+    auto vm = VM(prog);
     vm.memory[1] = noun;
     vm.memory[2] = verb;
     vm.run();

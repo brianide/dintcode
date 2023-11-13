@@ -43,10 +43,9 @@ void runSilver(ref Program prog) {
     foreach (perm; permutations(settings)) {  
         int64_t input = 0;
         foreach (phase; perm) {
-            scope auto vm = VM();
+            scope auto vm = VM(prog);
             auto io = QueueIOModule!2();
             vm.io = io.getModule();
-            vm.loadProgram(prog);
 
             io.pushInput(phase);
             io.pushInput(input);
@@ -68,7 +67,7 @@ void runGold(ref Program prog) {
         VM[5] vms;
 
         foreach (i; 0 .. 5) {
-            vms[i].loadProgram(prog);
+            vms[i].initialize(prog);
             vms[i].io = ioms[i].getModule();
             ioms[i].pushInput(perm[i]);
         }

@@ -33,9 +33,8 @@ auto findMode(const char* name) {
 int usage(const char* selfname) {
     fprintf(stderr, "Usage: %s file [mode]\n\n", selfname);
     fprintf(stderr, "  MODE  DESCRIPTION\n");
-    foreach(ref mode; modes) {
+    foreach(ref mode; modes)
         fprintf(stderr, "%6s  %s\n", mode.name, mode.desc);
-    }
     return 1;
 }
 

@@ -2,6 +2,7 @@ module vm;
 
 import core.stdc.stdint;
 import core.stdc.stdlib : calloc, realloc, free;
+import chunkmem;
 import ringbuffer;
 
 struct Program {
@@ -25,6 +26,9 @@ Program readProgram(const char* path) {
     size_t cursor = 0;
 
     FILE* f = fopen(path, "r");
+    assert(f);
+    scope (exit) fclose(f);
+
     int64_t value;
     while (!feof(f) && fscanf(f, "%ld,", &value) == 1) {
         if (cursor == capacity) {
@@ -33,7 +37,6 @@ Program readProgram(const char* path) {
         }
         buffer[cursor++] = value;
     }
-    fclose(f);
 
     buffer = cast(int64_t*) realloc(buffer, cursor * int64_t.sizeof);
     return Program(cursor, buffer);
@@ -57,6 +60,9 @@ struct OpData {
     Opcode code;
 }
 
+// Table for quickly looking up information for each CPU instruction.
+// We pack Halt (code 99) into the 0 slot by XORing the code we're
+// looking up by itself shifted 5 bits to the right.
 static immutable OpData[] opdata = [
     {"HLT", 0, Opcode.halt},
     {"ADD", 3, Opcode.add},
@@ -69,6 +75,9 @@ static immutable OpData[] opdata = [
     {"TEQ", 3, Opcode.equals},
 ];
 
+// Used to determine how big our statically-sized param buffer needs to be.
+// Declaring this as a single-case enum ensures that it's handled by CTFE;
+// very neat feature of D.
 enum MaxArgs = function uint_fast8_t() {
     uint_fast8_t max = 0;
     foreach (op; opdata)
@@ -107,128 +116,133 @@ struct IOModule {
 struct VM {
     State state;
     size_t ip;
-    int64_t[4096] memory;
+    ChunkMemory!2048 memory;
     IOModule io;
 
-    void loadProgram(ref Program prog) {
-        import core.stdc.string : memcpy;
-        memcpy(this.memory.ptr, prog.data, prog.length * int64_t.sizeof);
+    void initialize(ref Program prog) {
+        memory.initialize();
+        loadProgram(this, prog);
     }
 
-    bool getNextOp(out immutable(OpData)* op, out int64_t*[MaxArgs] params) {
-        auto inst = memory[ip] % 100;
-        inst = (inst >> 5) ^ inst;
-        if (inst >= opdata.length)
-            return false;
-        op = &opdata[inst];
-
-        auto modes = memory[ip] / 10;
-        foreach (i; 0 .. op.argc) {
-            switch ((modes /= 10) % 10) {
-                case Mode.position:
-                    params[i] = &memory[memory[ip + 1 + i]];
-                    continue;
-                case Mode.immediate:
-                    params[i] = &memory[ip + 1 + i];
-                    continue;
-                default:
-                    return false;
-            }
-        }
-
-        return true;
+    this(ref Program prog) {
+        initialize(prog);
     }
+}
 
-    Event step() {
-        immutable(OpData)* op;
-        int64_t*[MaxArgs] p;
+void loadProgram(ref VM vm, ref Program prog) {
+    foreach (i; 0 .. prog.length)
+        vm.memory[i] = prog.data[i];
+}
 
-        if (!getNextOp(op, p)) {
-            state = State.invalid;
-            return Event.error;
-        }
+bool getNextOp(ref VM vm, out immutable(OpData)* op, out int64_t*[MaxArgs] params) {
+    auto inst = vm.memory[vm.ip] % 100;
+    inst = (inst >> 5) ^ inst;
+    if (inst >= opdata.length)
+        return false;
+    op = &opdata[inst];
 
-        scope auto inc = () { ip += 1 + op.argc; };
-
-        final switch (op.code) {
-            case Opcode.add:
-                *p[2] = *p[0] + *p[1];
-                inc();
-                return Event.none;
-
-            case Opcode.multiply:
-                *p[2] = *p[0] * *p[1];
-                inc();
-                return Event.none;
-
-            case Opcode.input:
-                if (!io.inputAvailable()) {
-                    return Event.needInput;
-                }
-                *p[0] = io.inputProvider();
-                inc();
-                return Event.none;
-
-            case Opcode.output:
-                if (!io.outputCapacity()) {
-                    state = State.outputFull;
-                    return Event.error;
-                }
-                io.outputHandler(*p[0]);
-                inc();
-                return Event.output;
-
-            case Opcode.jumpTrue:
-                if (*p[0])
-                    ip = *p[1];
-                else
-                    inc();
-                return Event.none;
-
-            case Opcode.jumpFalse:
-                if (!*p[0])
-                    ip = *p[1];
-                else
-                    inc();
-                return Event.none;
-
-            case Opcode.lessThan:
-                *p[2] = *p[0] < *p[1] ? 1 : 0;
-                inc();
-                return Event.none;
-
-            case Opcode.equals:
-                *p[2] = *p[0] == *p[1] ? 1 : 0;
-                inc();
-                return Event.none;
-
-            case Opcode.halt:
-                state = State.halted;
-                return Event.halt;
+    auto modes = vm.memory[vm.ip] / 10;
+    foreach (i; 0 .. op.argc) {
+        switch ((modes /= 10) % 10) {
+            case Mode.position:
+                params[i] = &vm.memory[vm.memory[vm.ip + 1 + i]];
+                continue;
+            case Mode.immediate:
+                params[i] = &vm.memory[vm.ip + 1 + i];
+                continue;
+            default:
+                return false;
         }
     }
 
-    State run() {
-        while (state == state.ok)
-            step();
-        return state;
+    return true;
+}
+
+Event step(ref VM vm) {
+    immutable(OpData)* op;
+    int64_t*[MaxArgs] p;
+
+    if (!vm.getNextOp(op, p)) {
+        vm.state = State.invalid;
+        return Event.error;
     }
 
-    Event runUntil(Event flags) {
-        if (state != state.ok)
+    scope auto inc = () { vm.ip += 1 + op.argc; };
+
+    final switch (op.code) {
+        case Opcode.add:
+            *p[2] = *p[0] + *p[1];
+            inc();
             return Event.none;
-        
-        flags = flags | Event.halt | Event.error;
 
-        Event event;
-        do {
-            event = step();
-        } while (!(event & flags));
+        case Opcode.multiply:
+            *p[2] = *p[0] * *p[1];
+            inc();
+            return Event.none;
 
-        return event;
+        case Opcode.input:
+            if (!vm.io.inputAvailable()) {
+                return Event.needInput;
+            }
+            *p[0] = vm.io.inputProvider();
+            inc();
+            return Event.none;
+
+        case Opcode.output:
+            if (!vm.io.outputCapacity()) {
+                vm.state = State.outputFull;
+                return Event.error;
+            }
+            vm.io.outputHandler(*p[0]);
+            inc();
+            return Event.output;
+
+        case Opcode.jumpTrue:
+            if (*p[0])
+                vm.ip = *p[1];
+            else
+                inc();
+            return Event.none;
+
+        case Opcode.jumpFalse:
+            if (!*p[0])
+                vm.ip = *p[1];
+            else
+                inc();
+            return Event.none;
+
+        case Opcode.lessThan:
+            *p[2] = *p[0] < *p[1] ? 1 : 0;
+            inc();
+            return Event.none;
+
+        case Opcode.equals:
+            *p[2] = *p[0] == *p[1] ? 1 : 0;
+            inc();
+            return Event.none;
+
+        case Opcode.halt:
+            vm.state = State.halted;
+            return Event.halt;
     }
+}
 
-    this(ref IOModule io) {
-        this.io = io;
-    }
+State run(ref VM vm) {
+    while (vm.state == State.ok)
+        vm.step();
+    return vm.state;
+}
+
+Event runUntil(ref VM vm, Event flags) {
+    if (vm.state != State.ok)
+        return Event.none;
+    
+    flags = flags | Event.halt | Event.error;
+
+    Event event;
+    do {
+        event = vm.step();
+    } while (!(event & flags));
+
+    return event;
 }

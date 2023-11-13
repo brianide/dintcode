@@ -1,11 +1,11 @@
 module arraylist;
 
-import core.stdc.stdlib : realloc, free;
 import core.stdc.stdio;
+import memc;
 
-enum GrowFactor = 1.5;
+enum DefaultGrowFactor = 1.5;
 
-struct ArrayList(T) {
+struct ArrayList(T, float G = DefaultGrowFactor) {
     size_t capacity;
     size_t count;
     T* items;
@@ -13,18 +13,27 @@ struct ArrayList(T) {
     this(size_t capacity) {
         this.capacity = capacity;
         this.count = 0;
-        resize_array(items, capacity);
+        this.items = calloc!T(capacity);
     }
 
     ~this() {
         free(items);
     }
 
-    void push_back(T item) {
+    void pushBack(T item) {
         if (count == capacity) {
-            resize_array(items, cast(size_t) (capacity * GrowFactor));
+            capacity = cast(size_t) (capacity * G);
+            printf("%lu\n", capacity);
+            realloc!T(items, capacity);
         }
         items[count++] = item;
+    }
+
+    void condense() {
+        if (capacity > count) {
+            capacity = count;
+            realloc!T(items, capacity);
+        }
     }
 
     auto opIndex() {
@@ -34,8 +43,4 @@ struct ArrayList(T) {
     ref T opIndex(size_t ind) {
         return items[ind];
     }
-}
-
-private void resize_array(T)(ref T* list, size_t new_cap) {
-    list = cast(T*) realloc(list, new_cap * T.sizeof);
 }

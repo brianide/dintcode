@@ -21,6 +21,7 @@
         <arg line="-g --fsanitize=address"/>
         <arg line="--od=${obj.dir}"/>
         <arg line="--of=${exe.name}"/>
+        <arg line="-I=src/"/>
         <arg line="${src.files}"/>
     </exec>
 </target>
@@ -31,6 +32,7 @@
         <arg line="--release"/>
         <arg line="--od=${obj.dir}"/>
         <arg line="--of=${exe.name}"/>
+        <arg line="-I=src/"/>
         <arg line="${src.files}"/>
     </exec>
 </target>

@@ -51,6 +51,7 @@ enum Opcode {
     jumpFalse,
     lessThan,
     equals,
+    adjustBase,
     halt = 99
 }
 
@@ -73,6 +74,7 @@ static immutable OpData[] opdata = [
     {"JZE", 2, Opcode.jumpFalse},
     {"TLT", 3, Opcode.lessThan},
     {"TEQ", 3, Opcode.equals},
+    {"RBO", 1, Opcode.adjustBase}
 ];
 
 // Used to determine how big our statically-sized param buffer needs to be.
@@ -88,7 +90,8 @@ enum MaxArgs = function uint_fast8_t() {
 
 enum Mode {
     position,
-    immediate
+    immediate,
+    relative
 }
 
 enum State {
@@ -116,11 +119,11 @@ struct IOModule {
 struct VM {
     State state;
     size_t ip;
-    ChunkMemory!2048 memory;
+    size_t rb;
+    auto memory = ChunkMemory!2048();
     IOModule io;
 
     void initialize(ref Program prog) {
-        memory.initialize();
         loadProgram(this, prog);
     }
 
@@ -149,6 +152,9 @@ bool getNextOp(ref VM vm, out immutable(OpData)* op, out int64_t*[MaxArgs] param
                 continue;
             case Mode.immediate:
                 params[i] = &vm.memory[vm.ip + 1 + i];
+                continue;
+            case Mode.relative:
+                params[i] = &vm.memory[vm.memory[vm.ip + 1 + i] + vm.rb];
                 continue;
             default:
                 return false;
@@ -218,6 +224,11 @@ Event step(ref VM vm) {
 
         case Opcode.equals:
             *p[2] = *p[0] == *p[1] ? 1 : 0;
+            inc();
+            return Event.none;
+        
+        case Opcode.adjustBase:
+            vm.rb += *p[0];
             inc();
             return Event.none;
 

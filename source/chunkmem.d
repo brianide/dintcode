@@ -10,11 +10,7 @@ struct Chunk(size_t S) {
 }
 
 struct ChunkMemory(size_t S) {
-    ArrayList!(Chunk!S*) chunkPtrs;
-
-    void initialize() {
-        chunkPtrs = ArrayList!(Chunk!S*)(4);
-    }
+    auto chunkPtrs = ArrayList!(Chunk!S*)(4);
 
     ~this() {
         foreach (chunk; chunkPtrs)

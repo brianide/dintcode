@@ -3,6 +3,7 @@ module arraylist;
 import core.stdc.stdio;
 import memc;
 
+enum DefaultCapacity = 8;
 enum DefaultGrowFactor = 1.5;
 
 struct ArrayList(T, float G = DefaultGrowFactor) {
@@ -13,17 +14,16 @@ struct ArrayList(T, float G = DefaultGrowFactor) {
     this(size_t capacity) {
         this.capacity = capacity;
         this.count = 0;
-        this.items = calloc!T(capacity);
     }
 
     ~this() {
-        free(items);
+        if (items)
+            free(items);
     }
 
     void pushBack(T item) {
-        if (count == capacity) {
+        if (!items || count == capacity) {
             capacity = cast(size_t) (capacity * G);
-            printf("%lu\n", capacity);
             realloc!T(items, capacity);
         }
         items[count++] = item;
@@ -37,6 +37,7 @@ struct ArrayList(T, float G = DefaultGrowFactor) {
     }
 
     ref T opIndex(size_t ind) {
+        assert(ind < count);
         return items[ind];
     }
 

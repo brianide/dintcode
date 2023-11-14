@@ -36,11 +36,14 @@ struct ArrayList(T, float G = DefaultGrowFactor) {
         }
     }
 
-    auto opIndex() {
-        return items[0 .. count];
-    }
-
     ref T opIndex(size_t ind) {
         return items[ind];
+    }
+
+    int opApply(scope int delegate(T) dg) {
+        foreach (i; 0 .. count)
+            if (int res = dg(items[i]))
+                return res;
+        return 0;
     }
 }

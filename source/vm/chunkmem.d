@@ -1,8 +1,8 @@
-module chunkmem;
+module vm.chunkmem;
 
 import core.stdc.stdint : int64_t;
-import memc;
-import arraylist;
+import util.memc;
+import util.arraylist;
 
 struct Chunk(size_t S) {
     size_t index;

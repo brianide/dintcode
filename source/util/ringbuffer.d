@@ -1,4 +1,4 @@
-module ringbuffer;
+module util.ringbuffer;
 
 import core.stdc.stdint;
 

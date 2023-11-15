@@ -1,7 +1,7 @@
-module arraylist;
+module util.arraylist;
 
 import core.stdc.stdio;
-import memc;
+import util.memc;
 
 enum DefaultCapacity = 8;
 enum DefaultGrowFactor = 1.5;

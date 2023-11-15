@@ -1,4 +1,4 @@
-module memc;
+module util.memc;
 
 import clib = core.stdc.stdlib;
 import cstr = core.stdc.string;

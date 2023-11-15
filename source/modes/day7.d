@@ -1,9 +1,9 @@
-module day7;
+module modes.day7;
 
 import core.stdc.stdio;
 import core.stdc.stdint;
-import vm;
-import modules : QueueIOModule;
+import vm.vm;
+import vm.modules : QueueIOModule;
 
 void swap(T)(ref T a, ref T b) {
     T x = a;

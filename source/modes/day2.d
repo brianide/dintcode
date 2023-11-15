@@ -1,8 +1,8 @@
-module day2;
+module modes.day2;
 
 import core.stdc.stdint;
 import core.stdc.stdio;
-import vm;
+import vm.vm;
 
 static int64_t runWith(ref Program prog, int64_t noun, int64_t verb) {
     auto vm = VM(prog);

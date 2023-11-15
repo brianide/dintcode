@@ -1,9 +1,9 @@
 import core.stdc.stdio;
-import vm;
-static import day2;
-static import day5;
-static import day7;
-static import day9;
+import vm.vm;
+static import modes.day2;
+static import modes.day5;
+static import modes.day7;
+static import modes.day9;
 
 struct Mode {
     const char* name;
@@ -11,22 +11,22 @@ struct Mode {
     const char* desc;
 }
 
-immutable static Mode[] modes = [
-    {"run",   &runProg,        "Run & Print Output"},
-    {"day2s", &day2.runSilver, "Gravity Assist"},
-    {"day2g", &day2.runGold,   "Parameter Modes"},
-    {"day5s", &day5.runSilver, "T.E.S.T."},
-    {"day5g", &day5.runGold,   "Jumps & Comparisons"},
-    {"day7s", &day7.runSilver, "Amplification Circuit"},
-    {"day7g", &day7.runGold,   "Feedback Loop"},
-    {"day9s", &day9.runSilver, "Sensor Boost"},
-    {"day9g", &day9.runGold,   "Feature Complete"}
+immutable static Mode[] runModes = [
+    {"run",   &runProg,              "Run & Print Output"},
+    {"day2s", &modes.day2.runSilver, "Gravity Assist"},
+    {"day2g", &modes.day2.runGold,   "Parameter Modes"},
+    {"day5s", &modes.day5.runSilver, "T.E.S.T."},
+    {"day5g", &modes.day5.runGold,   "Jumps & Comparisons"},
+    {"day7s", &modes.day7.runSilver, "Amplification Circuit"},
+    {"day7g", &modes.day7.runGold,   "Feedback Loop"},
+    {"day9s", &modes.day9.runSilver, "Sensor Boost"},
+    {"day9g", &modes.day9.runGold,   "Feature Complete"}
 ];
 
 auto findMode(const char* name) {
     import core.stdc.string : strcmp;
 
-    foreach(ref mode; modes)
+    foreach(ref mode; runModes)
         if (strcmp(name, mode.name) == 0) {
             return &mode;
     }
@@ -46,7 +46,7 @@ void runProg(ref Program prog) {
 int usage(const char* selfname) {
     fprintf(stderr, "Usage: %s file [mode]\n\n", selfname);
     fprintf(stderr, "  MODE  DESCRIPTION\n");
-    foreach(ref mode; modes)
+    foreach(ref mode; runModes)
         fprintf(stderr, "%6s  %s\n", mode.name, mode.desc);
     return 1;
 }

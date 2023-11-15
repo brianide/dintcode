@@ -1,9 +1,9 @@
-module vm;
+module vm.vm;
 
 import core.stdc.stdint;
 import core.stdc.stdlib : calloc, realloc, free;
-import chunkmem;
-import ringbuffer;
+import util.ringbuffer;
+import vm.chunkmem;
 
 struct Program {
     size_t length;

@@ -1,8 +1,8 @@
-module day5;
+module modes.day5;
 
 import core.stdc.stdint;
 import core.stdc.stdio;
-import vm;
+import vm.vm;
 
 struct Handler(int64_t V) {
     int64_t lastValue;

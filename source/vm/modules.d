@@ -1,8 +1,8 @@
-module modules;
+module vm.modules;
 
 import core.stdc.stdint;
-import vm;
-import ringbuffer;
+import util.ringbuffer;
+import vm.vm;
 
 struct QueueIOModule(size_t I, size_t O = I) {
     RingBuffer!(int64_t, I) input;

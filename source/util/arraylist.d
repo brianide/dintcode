@@ -41,7 +41,7 @@ struct ArrayList(T, float G = DefaultGrowFactor) {
         return items[ind];
     }
 
-    int opApply(scope int delegate(T) dg) {
+    int opApply(scope int delegate(ref T) dg) {
         foreach (i; 0 .. count)
             if (int res = dg(items[i]))
                 return res;

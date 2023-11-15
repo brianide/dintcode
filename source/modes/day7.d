@@ -2,14 +2,9 @@ module modes.day7;
 
 import core.stdc.stdio;
 import core.stdc.stdint;
+import std.algorithm.mutation : swap;
 import vm.vm;
 import vm.modules : QueueIOModule;
-
-void swap(T)(ref T a, ref T b) {
-    T x = a;
-    a = b;
-    b = x;
-}
 
 struct PermRange(T) {
     T[] items;

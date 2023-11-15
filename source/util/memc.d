@@ -1,36 +1,41 @@
 module util.memc;
 
 import clib = core.stdc.stdlib;
-import cstr = core.stdc.string;
+import core.lifetime : emplace;
+// import cstr = core.stdc.string;
 
 T* malloc(T, bool Z = false)() {
-    void* ptr = clib.malloc(T.sizeof);
+    T* ptr = cast(T*) clib.malloc(T.sizeof);
     assert(ptr);
     static if (Z)
-        cstr.memset(ptr, 0, T.sizeof);
-    return cast(T*) ptr;
+        emplace!T(ptr);
+    return ptr;
 }
 
 T* calloc(T, bool Z = false)(size_t count) {
-    void* ptr = clib.calloc(count, T.sizeof);
+    T* ptr = cast(T*) clib.calloc(count, T.sizeof);
     assert(ptr);
     static if (Z)
-        cstr.memset(ptr, 0, count * T.sizeof);
-    return cast(T*) ptr;
+        foreach (i; 0 .. count)
+            emplace!T(&ptr[i]);
+    return ptr;
 }
 
 T* realloc(T)(ref T* ptr, size_t newCap) {
-    void* newPtr = clib.realloc(ptr, newCap * T.sizeof);
+    T* newPtr = cast(T*) clib.realloc(ptr, newCap * T.sizeof);
     assert(newPtr);
-    ptr = cast(T*) newPtr;
+    ptr = newPtr;
     return ptr;
 }
 
 T* realloc(T)(ref T* ptr, size_t oldSize, size_t newSize) {
     T* ptr = realloc(ptr, newSize);
-    cstr.memset(ptr + oldSize, 0, newSize - oldSize);
+    foreach (i; oldSize .. newSize)
+        emplace(&ptr[i]);
 }
 
-void free(T)(T* ptr) {
+void free(T, bool D = false)(T* ptr) {
+    static if (D)
+        destroy!false(*ptr);
     clib.free(ptr);
 }

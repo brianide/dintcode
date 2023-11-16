@@ -1,5 +1,6 @@
 import core.stdc.stdio;
 import vm.vm;
+static import modes.stdio;
 static import modes.day2;
 static import modes.day5;
 static import modes.day7;
@@ -12,7 +13,7 @@ struct Mode {
 }
 
 immutable static Mode[] runModes = [
-    {"run",   &runProg,              "Run & Print Output"},
+    {"--",    &modes.stdio.runProg,  "Run with Standard I/O"},
     {"day2s", &modes.day2.runSilver, "Gravity Assist"},
     {"day2g", &modes.day2.runGold,   "Parameter Modes"},
     {"day5s", &modes.day5.runSilver, "T.E.S.T."},
@@ -32,15 +33,6 @@ auto findMode(const char* name) {
     }
 
     return null;
-}
-
-void runProg(ref Program prog) {
-    scope auto vm = VM();
-    vm.io.inputAvailable = () => 0;
-    vm.io.outputCapacity = () => 1;
-    vm.io.outputHandler = (n) { printf("%ld\n", n); };
-    vm.loadProgram(prog);
-    vm.run();
 }
 
 int usage(const char* selfname) {

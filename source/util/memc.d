@@ -29,9 +29,10 @@ T* realloc(T)(ref T* ptr, size_t newCap) {
 }
 
 T* realloc(T)(ref T* ptr, size_t oldSize, size_t newSize) {
-    T* ptr = realloc(ptr, newSize);
+    ptr = realloc(ptr, newSize);
     foreach (i; oldSize .. newSize)
         emplace(&ptr[i]);
+    return ptr;
 }
 
 void free(T, bool D = false)(T* ptr) {

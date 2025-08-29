@@ -2,6 +2,7 @@ module vm.vm;
 
 import core.stdc.stdint;
 import core.stdc.stdlib : calloc, realloc, free;
+import core.stdc.stdio : FILE, fopen, fclose, fscanf, feof;
 import util.ringbuffer;
 import vm.chunkmem;
 
@@ -18,19 +19,13 @@ struct Program {
     }
 }
 
-Program readProgram(const char* path) {
-    import core.stdc.stdio : FILE, fopen, fclose, fscanf, feof;
-
+Program readProgram(scope bool delegate(ref int64_t) getter) {
     size_t capacity = 1024;
     int64_t* buffer = cast(int64_t*) calloc(capacity, int64_t.sizeof);
     size_t cursor = 0;
 
-    FILE* f = fopen(path, "r");
-    assert(f);
-    scope (exit) fclose(f);
-
     int64_t value;
-    while (!feof(f) && fscanf(f, "%ld,", &value) == 1) {
+    while (getter(value)) {
         if (cursor == capacity) {
             capacity = cast(size_t) (capacity * 1.5);
             buffer = cast(int64_t*) realloc(buffer, capacity * int64_t.sizeof);
@@ -40,6 +35,16 @@ Program readProgram(const char* path) {
 
     buffer = cast(int64_t*) realloc(buffer, cursor * int64_t.sizeof);
     return Program(cursor, buffer);
+}
+
+Program readProgramFile(const char* path) {
+    FILE* f = fopen(path, "r");
+    assert(f);
+    scope (exit) fclose(f);
+
+    return readProgram((ref int64_t value) {
+        return !feof(f) && fscanf(f, "%ld,", &value) == 1;
+    });
 }
 
 enum Opcode {

@@ -8,27 +8,19 @@ struct QueueIOModule(size_t I, size_t O = I) {
     RingBuffer!(int64_t, I) input;
     RingBuffer!(int64_t, O) output;
 
-    size_t inputAvailable() {
-        return input.available;
+    bool provideInput(ref int64_t val) {
+        input.take(val);
+        return true;
     }
 
-    int64_t provideInput() {
-        return input.take();
-    }
-
-    size_t outputCapacity() {
-        return O - output.available;
-    }
-
-    void handleOutput(int64_t val) {
+    bool handleOutput(ref int64_t val) {
         output.put(val);
+        return true;
     }
 
     auto getModule() {
         return IOModule(
-            &inputAvailable,
             &provideInput,
-            &outputCapacity,
             &handleOutput
         );
     }

@@ -101,24 +101,26 @@ enum Mode {
 
 enum State {
     ok = 1 << 0,
-    outputFull = 1 << 1,
-    halted = 1 << 2,
-    invalid = 1 << 3
+    halted = 1 << 1,
+    invalid = 1 << 2
 }
 
 enum Event {
-    none,
-    needInput = 1 << 0,
-    output = 1 << 1,
-    halt = 1 << 2,
-    error = 1 << 3
+    none = 1 << 0,
+    input = 1 << 1,
+    output = 1 << 2,
+    halt = 1 << 3,
+    error = 1 << 4
+}
+
+enum IOType {
+    input,
+    output
 }
 
 struct IOModule {
-    size_t delegate() inputAvailable;
-    int64_t delegate() inputProvider;
-    size_t delegate() outputCapacity;
-    void delegate(int64_t) outputHandler;
+    bool delegate(ref int64_t arg) handleInput = null;
+    bool delegate(ref int64_t arg) handleOutput = null;
 }
 
 struct VM {
@@ -126,6 +128,7 @@ struct VM {
     size_t ip;
     size_t rb;
     auto memory = ChunkMemory!2048();
+    int64_t* ioReg = null;
     IOModule io;
 
     void initialize(ref Program prog) {
@@ -192,21 +195,19 @@ Event step(ref VM vm) {
             return Event.none;
 
         case Opcode.input:
-            if (!vm.io.inputAvailable()) {
-                return Event.needInput;
+            if (!vm.io.handleInput || !vm.io.handleInput(*p[0])) {
+                vm.ioReg = p[0];
+                return Event.input;
             }
-            *p[0] = vm.io.inputProvider();
             inc();
             return Event.none;
 
         case Opcode.output:
-            if (!vm.io.outputCapacity()) {
-                vm.state = State.outputFull;
-                return Event.error;
-            }
-            vm.io.outputHandler(*p[0]);
+            if (!vm.io.handleOutput || !vm.io.handleOutput(*p[0]))
+                vm.ioReg = p[0];
+                return Event.output;
             inc();
-            return Event.output;
+            return Event.none;
 
         case Opcode.jumpTrue:
             if (*p[0])
@@ -244,8 +245,11 @@ Event step(ref VM vm) {
 }
 
 State run(ref VM vm) {
-    while (vm.state == State.ok)
-        vm.step();
+    while (vm.state == State.ok) {
+        // IO pauses aren't valid in this mode of operation
+        if (!(vm.step() & (Event.none | Event.halt)))
+            vm.state = State.invalid;
+    }
     return vm.state;
 }
 

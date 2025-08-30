@@ -1,21 +1,36 @@
 module modes.binary;
 
-import core.stdc.stdint : uint64_t, int64_t;
+import core.stdc.stdint : uint8_t, uint64_t, int64_t;
 import core.stdc.stdio : feof, fread, fwrite, fflush, stdin, stdout;
 import vm.vm;
 
+enum ControlCode {
+    term = 0x09,
+    load = 0x10,
+    input = 0x11,
+    peek = 0x12
+}
+
+enum ResponseCode {
+    output = 0x11,
+    peek = 0x12
+}
+
+void sendMessage(ResponseCode code, int64_t[] vals) {
+    fwrite(&code, uint8_t.sizeof, 1, stdout);
+    fwrite(vals.ptr, int64_t.sizeof, vals.length, stdout);
+}
+
 void runProg() {
     scope auto vm = VM();
-    vm.io.inputAvailable = () => feof(stdin) ? 0 : 1;
-    vm.io.inputProvider = () {
-        int64_t buffer;
-        fread(&buffer, int64_t.sizeof, 1, stdin);
-        return buffer;
+    vm.io.handleInput = (ref int64_t arg) {
+        fread(&arg, int64_t.sizeof, 1, stdin);
+        return true;
     };
-    vm.io.outputCapacity = () => 1;
-    vm.io.outputHandler = (a) {
-        fwrite(&a, int64_t.sizeof, 1, stdout);
-        fflush(stdout);
+
+    vm.io.handleOutput = (ref int64_t arg) {
+        sendMessage(ResponseCode.output, [arg]);
+        return true;
     };
 
     // Get program length prefix
@@ -23,7 +38,7 @@ void runProg() {
     fread(&length, uint64_t.sizeof, 1, stdin);
 
     // Read program from stdin
-    Program prog = readProgram((ref int64_t value) {
+    auto prog = readProgram((ref int64_t value) {
         if (length-- <= 0)
             return false;
         return fread(&value, int64_t.sizeof, 1, stdin) == 1;

@@ -6,21 +6,22 @@ import vm.vm;
 
 void runProg() {
     scope auto vm = VM();
-    vm.io.inputAvailable = () => feof(stdin) ? 0 : 1;
-    vm.io.inputProvider = () {
-        int64_t buffer;
-        scanf("%ld,", &buffer);
-        return buffer;
+    vm.io.handleInput = (ref int64_t arg) {
+        scanf("%ld,", &arg);
+        return true;
     };
-    vm.io.outputCapacity = () => 1;
-    vm.io.outputHandler = (a) { printf("%ld\n", a); };
+
+    vm.io.handleOutput = (ref int64_t arg) {
+        printf("%ld\n", arg);
+        return true;
+    };
     
     // Get program length prefix
     uint64_t length;
     scanf("%ld", &length);
 
     // Read program from stdin
-    Program prog = readProgram((ref int64_t value) {
+    auto prog = readProgram((ref int64_t value) {
         if (length-- <= 0)
             return false;
         return scanf("%ld,", &value) == 1;

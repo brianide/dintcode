@@ -3,7 +3,7 @@ module vm.vm;
 import core.stdc.stdint;
 import core.stdc.stdlib : calloc, realloc, free;
 import core.stdc.stdio : FILE, fopen, fclose, fscanf, feof;
-import util.ringbuffer;
+import util.logger;
 import vm.chunkmem;
 
 struct Program {
@@ -101,16 +101,10 @@ enum Mode {
 
 enum State {
     ok = 1 << 0,
-    halted = 1 << 1,
-    invalid = 1 << 2
-}
-
-enum Event {
-    none = 1 << 0,
     input = 1 << 1,
     output = 1 << 2,
-    halt = 1 << 3,
-    error = 1 << 4
+    halted = 1 << 3,
+    invalid = 1 << 4
 }
 
 enum IOType {
@@ -143,11 +137,14 @@ struct VM {
 void loadProgram(ref VM vm, ref Program prog) {
     foreach (i; 0 .. prog.length)
         vm.memory[i] = prog.data[i];
+
+    info("Loaded program of %ld bytes\n", prog.length);
 }
 
 bool getNextOp(ref VM vm, out immutable(OpData)* op, out int64_t*[MaxArgs] params) {
     auto inst = vm.memory[vm.ip] % 100;
-    inst = (inst >> 5) ^ inst;
+
+    inst = (inst >> 5 ^ inst) & 0x0F;
     if (inst >= opdata.length)
         return false;
     op = &opdata[inst];
@@ -172,14 +169,16 @@ bool getNextOp(ref VM vm, out immutable(OpData)* op, out int64_t*[MaxArgs] param
     return true;
 }
 
-Event step(ref VM vm) {
+State step(ref VM vm) {
     immutable(OpData)* op;
     int64_t*[MaxArgs] p;
 
     if (!vm.getNextOp(op, p)) {
         vm.state = State.invalid;
-        return Event.error;
+        return vm.state;
     }
+
+    trace("%04lx: %s\n", vm.ip, op.name);
 
     scope auto inc = () { vm.ip += 1 + op.argc; };
 
@@ -187,82 +186,91 @@ Event step(ref VM vm) {
         case Opcode.add:
             *p[2] = *p[0] + *p[1];
             inc();
-            return Event.none;
+            break;
 
         case Opcode.multiply:
             *p[2] = *p[0] * *p[1];
             inc();
-            return Event.none;
+            break;
 
         case Opcode.input:
             if (!vm.io.handleInput || !vm.io.handleInput(*p[0])) {
                 vm.ioReg = p[0];
-                return Event.input;
+                vm.state = State.input;
             }
             inc();
-            return Event.none;
+            break;
 
         case Opcode.output:
-            if (!vm.io.handleOutput || !vm.io.handleOutput(*p[0]))
+            if (!vm.io.handleOutput || !vm.io.handleOutput(*p[0])) {
                 vm.ioReg = p[0];
-                return Event.output;
+                vm.state = State.output;
+            }
             inc();
-            return Event.none;
+            break;
 
         case Opcode.jumpTrue:
             if (*p[0])
                 vm.ip = *p[1];
             else
                 inc();
-            return Event.none;
+            break;
 
         case Opcode.jumpFalse:
             if (!*p[0])
                 vm.ip = *p[1];
             else
                 inc();
-            return Event.none;
+            break;
 
         case Opcode.lessThan:
             *p[2] = *p[0] < *p[1] ? 1 : 0;
             inc();
-            return Event.none;
+            break;
 
         case Opcode.equals:
             *p[2] = *p[0] == *p[1] ? 1 : 0;
             inc();
-            return Event.none;
+            break;
         
         case Opcode.adjustBase:
             vm.rb += *p[0];
             inc();
-            return Event.none;
+            break;
 
         case Opcode.halt:
             vm.state = State.halted;
-            return Event.halt;
+            break;
     }
-}
 
-State run(ref VM vm) {
-    while (vm.state == State.ok) {
-        // IO pauses aren't valid in this mode of operation
-        if (!(vm.step() & (Event.none | Event.halt)))
-            vm.state = State.invalid;
-    }
     return vm.state;
 }
 
-Event runUntil(ref VM vm, Event flags) {
+deprecated {
+    State run(ref VM vm) {
+        while (vm.state == State.ok) {
+            // IO pauses aren't valid in this mode of operation
+            if (!(vm.step() & (State.ok | State.halted)))
+                vm.state = State.invalid;
+        }
+        return vm.state;
+    }
+}
+
+State runUntil(ref VM vm, State flags) {
+    if (vm.state & (State.input | State.output)) {
+        vm.state = State.ok;
+        vm.ioReg = null;
+    }
+
     if (vm.state != State.ok)
-        return Event.none;
+        return vm.state;
     
-    flags = flags | Event.halt | Event.error;
+    flags = flags | State.halted | State.invalid;
 
-    Event event;
     do {
-        event = vm.step();
-    } while (!(event & flags));
+        vm.step();
+    } while (!(vm.state & flags));
 
-    return event;
+    return vm.state;
 }

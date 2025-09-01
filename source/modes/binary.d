@@ -74,7 +74,12 @@ bool processQueue(ref VM vm) {
         switch (code) {
             case ControlCode.load:
                 vm = VM();
-                
+                vm.io.handleOutput = (ref int64_t arg) {
+                    trace("Outputting value: %ld\n", arg);
+                    sendMessage(ResponseCode.outp, [arg]);
+                    return true;
+                };
+
                 int64_t length;
                 if (!readVal(length))
                     return false;
@@ -131,10 +136,6 @@ int runProg() {
     info("Binary runner starting\n");
 
     scope VM vm;
-    vm.io.handleOutput = (ref int64_t arg) {
-        sendMessage(ResponseCode.outp, [arg]);
-        return true;
-    };
 
     do {
         vm.runUntil(State.input);

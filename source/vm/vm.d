@@ -19,6 +19,13 @@ struct Program {
     }
 }
 
+Program wrapProgram(int64_t* ptr, size_t length) {
+    Program prog;
+    prog.data = ptr;
+    prog.length = length;
+    return prog;
+}
+
 Program readProgram(scope bool delegate(ref int64_t) getter) {
     size_t capacity = 1024;
     int64_t* buffer = cast(int64_t*) calloc(capacity, int64_t.sizeof);
@@ -104,7 +111,8 @@ enum State {
     input = 1 << 1,
     output = 1 << 2,
     halted = 1 << 3,
-    invalid = 1 << 4
+    invalid = 1 << 4,
+    unloaded = 1 << 5
 }
 
 enum IOType {
@@ -118,7 +126,7 @@ struct IOModule {
 }
 
 struct VM {
-    State state;
+    auto state = State.unloaded;
     size_t ip;
     size_t rb;
     auto memory = ChunkMemory!2048();
@@ -137,8 +145,9 @@ struct VM {
 void loadProgram(ref VM vm, ref Program prog) {
     foreach (i; 0 .. prog.length)
         vm.memory[i] = prog.data[i];
+    vm.state = State.ok;
 
-    info("Loaded program of %ld bytes\n", prog.length);
+    info("Loaded program of %ld words\n", prog.length);
 }
 
 bool getNextOp(ref VM vm, out immutable(OpData)* op, out int64_t*[MaxArgs] params) {

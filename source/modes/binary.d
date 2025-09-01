@@ -6,6 +6,7 @@ import vm.vm;
 
 /*
 *** COMMANDS
+* 0x08 LOAD [i64, ...] Loads a program of given length
 * 0x09 KILL []         Requests emulator termination
 * 0x11 INPT [i64]      Continue with input
 * 0x12 PEEK [i64]      Peek value at address
@@ -17,7 +18,8 @@ import vm.vm;
 * 0x12 PEEK [i64, i64] Address and value from peek
 */
 
-enum ControlCode { 
+enum ControlCode {
+    load = 0x08,
     kill = 0x09,
     inpt = 0x10,
     peek = 0x12,
@@ -49,15 +51,40 @@ bool readVal(T)(ref T buf) {
     return fread(&buf, T.sizeof, 1, stdin) == 1;
 }
 
+int64_t* read(int64_t length) {
+    import util.memc : calloc;
+    import core.stdc.stdio : fread, stdin;
+    auto buffer = calloc!int64_t(length);
+    fread(buffer, length, int64_t.sizeof, stdin);
+    return buffer;
+}
+
 bool processQueue(ref VM vm) {
     import core.stdc.stdio : fflush;
+    import util.memc : free;
 
     // ControlCode code;
     uint8_t code;
     int64_t[2] buffer;
 
     while (readVal(code)) {
+
+        trace("Received control code: %02x\n", code);
+
         switch (code) {
+            case ControlCode.load:
+                vm = VM();
+                
+                int64_t length;
+                if (!readVal(length))
+                    return false;
+
+                trace("Read program length of %ld\n", length);
+
+                auto prog = wrapProgram(read(length), length);
+                vm.loadProgram(prog);
+                return true;
+
             case ControlCode.kill:
                 return false;
 
@@ -78,7 +105,9 @@ bool processQueue(ref VM vm) {
             case ControlCode.peek:
                 if (!readVal(buffer[0]))
                     return false;
-                sendMessage(ResponseCode.peek, [vm.memory[buffer[0]]]);
+                
+                trace("Peek request for address: %ld\n", buffer[0]);
+                sendMessage(ResponseCode.peek, [buffer[0], vm.memory[buffer[0]]]);
                 continue;
             
             case ControlCode.poke:
@@ -90,7 +119,7 @@ bool processQueue(ref VM vm) {
                 continue;
             
             default:
-                trace("Received invalid control code: %02x\n", code);
+                error("Received invalid control code: %02x\n", code);
                 return false;
         }
     }
@@ -101,31 +130,16 @@ bool processQueue(ref VM vm) {
 int runProg() {
     info("Binary runner starting\n");
 
-    scope auto vm = VM();
+    scope VM vm;
     vm.io.handleOutput = (ref int64_t arg) {
         sendMessage(ResponseCode.outp, [arg]);
         return true;
     };
 
-    // Get program length prefix
-    int64_t length;
-    if (!readVal(length))
-        return 1;
-
-    trace("Read program length of %ld\n", length);
-
-    // Read program from stdin
-    auto prog = readProgram((ref int64_t value) {
-        if (length-- <= 0)
-            return false;
-        return readVal(value);
-    });
-    vm.loadProgram(prog);
-
     do {
         vm.runUntil(State.input);
-        if (vm.state == State.halted)
-            sendMessage(ResponseCode.halt, []);
+        // if (vm.state == State.halted)
+        //     sendMessage(ResponseCode.halt, []);
     } while(processQueue(vm));
 
     return 0;

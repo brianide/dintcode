@@ -7,7 +7,7 @@ import vm.vm;
 /*
 *** COMMANDS
 * 0x08 LOAD [i64, ...] Loads a program of given length
-* 0x09 KILL []         Requests emulator termination
+* 0x09 KILL []         Stop emulator and exit
 * 0x11 INPT [i64]      Continue with input
 * 0x12 PEEK [i64]      Peek value at address
 * 0x13 POKE [i64, i64] Poke value to address
@@ -36,10 +36,9 @@ void sendMessage(ResponseCode code, int64_t[] vals) {
     import core.stdc.stdio : fwrite, stdout, fflush;
 
     fwrite(&code, uint8_t.sizeof, 1, stdout);
-    if (vals.length) {
+    if (vals.length)
         fwrite(vals.ptr, int64_t.sizeof, vals.length, stdout);
-        fflush(stdout);
-    }
+    fflush(stdout);
 }
 
 bool readVal(T)(ref T buf) {
@@ -139,8 +138,19 @@ int runProg() {
 
     do {
         vm.runUntil(State.input);
-        // if (vm.state == State.halted)
-        //     sendMessage(ResponseCode.halt, []);
+        switch (vm.state) {
+            case State.halted:
+                trace("Halted normally\n");
+                sendMessage(ResponseCode.halt, []);
+                break;
+
+            case State.invalid:
+                trace("Halted on invalid state\n");
+                break;
+
+            default:
+                break;
+        }
     } while(processQueue(vm));
 
     return 0;
